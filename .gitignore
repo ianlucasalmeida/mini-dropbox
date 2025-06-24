@@ -1,0 +1,4 @@
+# .gitignore para mini-dropbox
+backend/.env
+*.pyc
+__pycache__/

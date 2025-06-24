@@ -1,0 +1,3 @@
+Flask
+boto3  # SDK da AWS para Python, usado para S3 e MinIO
+python-dotenv

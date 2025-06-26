@@ -1,802 +1,293 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudDrive - Armazenamento na Nuvem</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        /* Mantenha todos os estilos CSS originais */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+{% extends "base.html" %}
+{% block title %}Meus Arquivos{% endblock %}
 
-        :root {
-            --primary-color: #0078d4;
-            --primary-hover: #106ebe;
-            --secondary-color: #f3f2f1;
-            --text-primary: #323130;
-            --text-secondary: #605e5c;
-            --border-color: #edebe9;
-            --success-color: #107c10;
-            --danger-color: #d13438;
-            --shadow: 0 2px 8px rgba(0,0,0,0.1);
-            --shadow-hover: 0 4px 16px rgba(0,0,0,0.15);
-        }
+{% block body %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('index') }}"><i class="fas fa-box text-primary"></i> Mini Dropbox</a>
+        <ul class="navbar-nav ms-auto">
+            {% if current_user.is_authenticated %}
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle"></i> {{ username }}
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt fa-fw me-2"></i>Sair</a></li>
+                </ul>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</nav>
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: var(--text-primary);
-        }
+<main class="container mt-4">
+    <!-- Breadcrumbs e Alertas -->
+    <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>{% for crumb in breadcrumbs %}<li class="breadcrumb-item"><a href="/{{ crumb.path }}">{{ crumb.name }}</a></li>{% endfor %}</ol></nav>
+    {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}{% endwith %}
 
-        .header {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .storage-info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .storage-bar {
-            width: 100px;
-            height: 4px;
-            background: var(--border-color);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .storage-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success-color), var(--primary-color));
-            width: 45%;
-            transition: width 0.3s ease;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-
-        .upload-section {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: var(--shadow);
-        }
-
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 3rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upload-area:hover, .upload-area.dragover {
-            border-color: var(--primary-color);
-            background: rgba(0,120,212,0.05);
-        }
-
-        .upload-area.dragover::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,120,212,0.1);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.1; }
-            50% { opacity: 0.3; }
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-
-        .upload-text {
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-            color: var(--text-primary);
-        }
-
-        .upload-subtext {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        #fileInput {
-            display: none;
-        }
-
-        .toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .view-controls {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .view-btn {
-            padding: 0.5rem;
-            border: 1px solid var(--border-color);
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .view-btn.active, .view-btn:hover {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        .search-box {
-            display: flex;
-            align-items: center;
-            background: white;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            min-width: 300px;
-        }
-
-        .search-box input {
-            border: none;
-            outline: none;
-            flex: 1;
-            padding: 0.25rem 0;
-        }
-
-        .files-section {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-
-        .files-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-            padding: 1.5rem;
-        }
-
-        .files-list {
-            display: none;
-        }
-
-        .files-list.active {
-            display: block;
-        }
-
-        .files-grid.list-view {
-            display: none;
-        }
-
-        .file-card {
-            background: white;
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .file-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-hover);
-        }
-
-        .file-icon {
-            font-size: 2.5rem;
-            text-align: center;
-            margin-bottom: 0.5rem;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .file-name {
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-            word-break: break-word;
-            font-size: 0.9rem;
-        }
-
-        .file-info {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 0.5rem;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .file-card:hover .file-actions {
-            opacity: 1;
-        }
-
-        .action-btn {
-            padding: 0.25rem 0.5rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.2s ease;
-        }
-
-        .btn-download {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .btn-delete {
-            background: var(--danger-color);
-            color: white;
-        }
-
-        .action-btn:hover {
-            transform: scale(1.05);
-        }
-
-        .list-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .list-table th,
-        .list-table td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .list-table th {
-            background: var(--secondary-color);
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .list-table tr:hover {
-            background: rgba(0,120,212,0.05);
-        }
-
-        .list-file-icon {
-            width: 24px;
-            text-align: center;
-            margin-right: 0.5rem;
-        }
-
-        .list-file-name {
-            display: flex;
-            align-items: center;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-secondary);
-        }
-
-        .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .progress-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: var(--primary-color);
-            transform: scaleX(0);
-            transform-origin: left;
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .notification {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: var(--shadow-hover);
-            border-left: 4px solid var(--success-color);
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 0 1rem;
-            }
-            
-            .header {
-                padding: 1rem;
-            }
-            
-            .toolbar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .search-box {
-                min-width: auto;
-            }
-            
-            .files-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: 0.75rem;
-                padding: 1rem;
-            }
-        }
-
-        /* File type colors */
-        .file-pdf { color: #e53e3e; }
-        .file-doc { color: #3182ce; }
-        .file-img { color: #38a169; }
-        .file-video { color: #d69e2e; }
-        .file-audio { color: #805ad5; }
-        .file-archive { color: #718096; }
-        .file-code { color: #2d3748; }
-        .file-default { color: var(--text-secondary); }
-    </style>
-</head>
-<body>
-    <div class="progress-bar" id="progressBar"></div>
+    <!-- Cabeçalho com Ações e Toggle de Visualização -->
+    <div class="main-header mb-4">
+        <div class="btn-group view-toggle" role="group">
+            <button type="button" class="btn btn-sm" id="grid-view-btn"><i class="fas fa-th-large"></i></button>
+            <button type="button" class="btn btn-sm active" id="list-view-btn"><i class="fas fa-list"></i></button>
+        </div>
+        <div>
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#newFolderModal"><i class="fas fa-folder-plus me-2"></i>Nova Pasta</button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadFileModal"><i class="fas fa-upload me-2"></i>Enviar Arquivo</button>
+        </div>
+    </div>
     
-    <header class="header">
-        <div class="header-content">
-            <div class="logo">
-                <i class="fas fa-cloud"></i>
-                CloudDrive
+    <!-- Container das Visualizações -->
+    <div id="file-container">
+        <!-- Visualização em Lista -->
+        <div id="list-view" class="view-container">
+            <div class="list-header d-none d-md-flex">
+                <div class="list-view-column-name">Nome</div>
+                <div class="list-view-column-size">Tamanho</div>
+                <div class="list-view-column-actions">Ações</div>
             </div>
-            <div class="user-info">
-                <div class="storage-info">
-                    <span>4.5 GB de 10 GB usados</span>
-                    <div class="storage-bar">
-                        <div class="storage-fill"></div>
+            {% for folder in folders %}
+            <div class="list-item item" data-item-id="{{ folder.id }}" data-item-name="{{ folder.name }}">
+                <a href="{{ (current_path + '/' + folder.name).replace('//', '/') }}" class="d-flex align-items-center text-dark flex-grow-1 me-3 text-truncate">
+                    <i class="fas fa-folder item-icon"></i>
+                    <span class="item-name">{{ folder.name }}</span>
+                </a>
+                <div class="item-size d-none d-md-block">-</div>
+                <div class="item-actions">
+                    <a href="{{ url_for('download_folder', folder_id=folder.id) }}" class="btn btn-sm btn-light border" title="Baixar {{ folder.name }}"><i class="fas fa-download"></i></a>
+                    <button class="btn btn-sm btn-light border delete-btn" title="Apagar {{ folder.name }}"><i class="fas fa-trash-alt text-danger"></i></button>
+                </div>
+            </div>
+            {% endfor %}
+            {% for file in files %}
+            <div class="list-item file-item item" data-item-id="{{ file.id }}" data-item-name="{{ file.name }}">
+                <div class="tag-dot tag-{{ file.tag or 'none' }}"></div>
+                <i class="fas fa-file-alt item-icon text-secondary"></i>
+                <span class="item-name">{{ file.name }}</span>
+                <span class="item-size d-none d-md-block">{{ "%.2f"|format(file.size / 1024 if file.size else 0) }} KB</span>
+                <div class="item-actions">
+                    <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-sm btn-light border" title="Baixar {{ file.name }}"><i class="fas fa-download"></i></a>
+                    <button class="btn btn-sm btn-light border delete-btn" title="Apagar {{ file.name }}"><i class="fas fa-trash-alt text-danger"></i></button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Visualização em Grade -->
+        <div id="grid-view" class="view-container d-none">
+            <div class="row">
+                {% for folder in folders %}
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-4">
+                    <div class="item-card item text-center position-relative" data-item-id="{{ folder.id }}" data-item-name="{{ folder.name }}">
+                        <a href="{{ (current_path + '/' + folder.name).replace('//', '/') }}" class="stretched-link" aria-label="Abrir pasta {{ folder.name }}"></a>
+                        <div class="item-actions">
+                           <a href="{{ url_for('download_folder', folder_id=folder.id) }}" class="btn btn-sm btn-light bg-white border"><i class="fas fa-download"></i></a>
+                           <button class="btn btn-sm btn-light bg-white border delete-btn"><i class="fas fa-trash-alt text-danger"></i></button>
+                        </div>
+                        <div class="item-icon-wrapper"><i class="fas fa-folder item-icon"></i></div>
+                        <span class="item-name" title="{{ folder.name }}">{{ folder.name }}</span>
                     </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <i class="fas fa-user-circle" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
-                    <span>Usuário</span>
+                {% endfor %}
+                {% for file in files %}
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-4">
+                    <div class="item-card file-item item text-center position-relative" data-item-id="{{ file.id }}" data-item-name="{{ file.name }}">
+                         <div class="item-actions">
+                           <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-sm btn-light bg-white border"><i class="fas fa-download"></i></a>
+                           <button class="btn btn-sm btn-light bg-white border delete-btn"><i class="fas fa-trash-alt text-danger"></i></button>
+                        </div>
+                        <div class="tag-dot tag-{{ file.tag or 'none' }}"></div>
+                        <div class="item-icon-wrapper">
+                            {% if file.thumbnail_url %}
+                                <img src="{{ file.thumbnail_url }}" class="item-thumbnail" alt="Preview de {{ file.name }}" loading="lazy">
+                            {% else %}
+                                <i class="fas fa-file-alt item-icon text-secondary"></i>
+                            {% endif %}
+                        </div>
+                        <span class="item-name" title="{{ file.name }}">{{ file.name }}</span>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
-    </header>
+    </div>
+</main>
 
-    <div class="container">
-        <div class="upload-section">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                </div>
-                <div class="upload-text">Arraste arquivos aqui ou clique para selecionar</div>
-                <div class="upload-subtext">Suporte para todos os tipos de arquivo • Máximo 100MB por arquivo</div>
+<!-- Menu de Contexto -->
+<div id="context-menu" class="context-menu">
+    <div class="context-menu-item" data-action="move"><i class="fas fa-folder-open"></i>Mover para...</div>
+    <hr>
+    <div class="context-menu-item" data-action="tag" data-tag="red"><i class="fas fa-circle" style="color:var(--tag-red)"></i>Importante</div>
+    <div class="context-menu-item" data-action="tag" data-tag="blue"><i class="fas fa-circle" style="color:var(--tag-blue)"></i>Trabalho</div>
+    <div class="context-menu-item" data-action="tag" data-tag="green"><i class="fas fa-circle" style="color:var(--tag-green)"></i>Pessoal</div>
+    <div class="context-menu-item" data-action="tag" data-tag="yellow"><i class="fas fa-circle" style="color:var(--tag-yellow)"></i>Em Andamento</div>
+    <div class="context-menu-item" data-action="tag" data-tag="none"><i class="fas fa-times"></i>Remover Tag</div>
+    <hr>
+    <div class="context-menu-item text-danger" data-action="delete"><i class="fas fa-trash-alt"></i>Apagar</div>
+</div>
+
+<!-- Modais -->
+<div class="modal fade" id="newFolderModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Criar Nova Pasta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form action="{{ url_for('create_folder') }}" method="post"><div class="modal-body"><input type="hidden" name="current_path" value="{{ current_path }}"><input type="text" name="folder_name" class="form-control" placeholder="Nome da pasta" required></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Criar</button></div></form></div></div></div>
+<div class="modal fade" id="uploadFileModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Enviar Arquivo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data"><div class="modal-body"><input type="hidden" name="current_path" value="{{ current_path }}"><input type="file" name="file" class="form-control" required></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Enviar</button></div></form></div></div></div>
+<div class="modal fade" id="deleteItemModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirmar Exclusão</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>Você tem certeza que deseja apagar <strong id="deleteItemName"></strong>? <br><span class="text-danger">Esta ação não pode ser desfeita.</span></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><form id="deleteItemForm" method="post" style="display: inline;"><button type="submit" class="btn btn-danger">Apagar</button></form></div></div></div></div>
+
+<!-- NOVO MODAL: Mover Item -->
+<div class="modal fade" id="moveItemModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mover Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
-                <input type="file" id="fileInput" name="file" multiple>
+            <form id="moveItemForm" method="post">
+                <div class="modal-body">
+                    <p>Selecione a pasta de destino para <strong id="moveItemName"></strong>:</p>
+                    <div id="folderTree" class="folder-tree">Carregando pastas...</div>
+                    <input type="hidden" name="target_path" id="targetPathInput">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" disabled>Mover</button>
+                </div>
             </form>
         </div>
+    </div>
+</div>
 
-        <div class="toolbar">
-            <div class="view-controls">
-                <button class="view-btn active" onclick="toggleView('grid')" title="Visualização em grade">
-                    <i class="fas fa-th"></i>
-                </button>
-                <button class="view-btn" onclick="toggleView('list')" title="Visualização em lista">
-                    <i class="fas fa-list"></i>
-                </button>
-            </div>
-            <div class="search-box">
-                <i class="fas fa-search" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
-                <input type="text" placeholder="Pesquisar arquivos..." id="searchInput">
-            </div>
-        </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const gridBtn = document.getElementById('grid-view-btn');
+    const listBtn = document.getElementById('list-view-btn');
+    const gridView = document.getElementById('grid-view');
+    const listView = document.getElementById('list-view');
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteItemModal'));
+    const deleteItemForm = document.getElementById('deleteItemForm');
+    const deleteItemName = document.getElementById('deleteItemName');
+    const moveModal = new bootstrap.Modal(document.getElementById('moveItemModal'));
+    const moveItemForm = document.getElementById('moveItemForm');
+    const moveItemName = document.getElementById('moveItemName');
+    const folderTreeDiv = document.getElementById('folderTree');
+    const targetPathInput = document.getElementById('targetPathInput');
+    const moveSubmitBtn = moveItemForm.querySelector('button[type="submit"]');
+    const contextMenu = document.getElementById('context-menu');
+    let currentItemId = null;
+    let currentItemName = null;
 
-        <div class="files-section">
-            <div class="files-grid" id="filesGrid">
-                <!-- Arquivos serão carregados dinamicamente via JavaScript -->
-            </div>
+    // --- Lógica de Visualização (Grid/List) ---
+    const currentView = localStorage.getItem('viewMode') || 'list';
+    if (currentView === 'grid') {
+        gridView.classList.remove('d-none');
+        listView.classList.add('d-none');
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+    }
+    gridBtn.addEventListener('click', () => { gridView.classList.remove('d-none'); listView.classList.add('d-none'); gridBtn.classList.add('active'); listBtn.classList.remove('active'); localStorage.setItem('viewMode', 'grid'); });
+    listBtn.addEventListener('click', () => { listView.classList.remove('d-none'); gridView.classList.add('d-none'); listBtn.classList.add('active'); gridBtn.classList.remove('active'); localStorage.setItem('viewMode', 'list'); });
 
-            <div class="files-list" id="filesList">
-                <table class="list-table">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Tamanho</th>
-                            <th>Modificado</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="filesListBody">
-                        <!-- Arquivos serão carregados dinamicamente via JavaScript -->
-                    </tbody>
-                </table>
-            </div>
+    // --- Funções de Ação (Excluir e Mover) ---
+    function prepareDeleteModal(itemId, itemName) {
+        deleteItemName.textContent = `"${itemName}"`;
+        deleteItemForm.action = `/delete_item/${itemId}`;
+        deleteModal.show();
+    }
+
+    function buildFolderTree(node, element, level = 0) {
+        Object.values(node.subfolders).forEach(folder => {
+            const folderDiv = document.createElement('div');
+            folderDiv.innerHTML = `<i class="fas fa-folder fa-fw"></i> ${folder.name}`;
+            folderDiv.className = 'folder-item';
+            folderDiv.style.paddingLeft = `${level * 20 + 10}px`;
+            folderDiv.dataset.path = folder.path;
             
-            <div class="empty-state" id="emptyState" style="display: none;">
-                <i class="fas fa-cloud-upload-alt empty-icon"></i>
-                <h3>Nenhum arquivo encontrado</h3>
-                <p>Comece enviando arquivos clicando na área de upload acima.</p>
-            </div>
-        </div>
-    </div>
+            folderDiv.addEventListener('click', function() {
+                document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('selected'));
+                this.classList.add('selected');
+                targetPathInput.value = this.dataset.path;
+                moveSubmitBtn.disabled = false;
+            });
+            
+            element.appendChild(folderDiv);
+            if (Object.keys(folder.subfolders).length > 0) {
+                buildFolderTree(folder, element, level + 1);
+            }
+        });
+    }
 
-    <div class="notification" id="notification">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
-            <span id="notificationText">Arquivo enviado com sucesso!</span>
-        </div>
-    </div>
-
-    <script>
-        let currentView = 'grid';
+    async function prepareMoveModal(itemId, itemName) {
+        moveItemName.textContent = `"${itemName}"`;
+        moveItemForm.action = `/move_item/${itemId}`;
+        folderTreeDiv.innerHTML = 'Carregando pastas...';
+        moveSubmitBtn.disabled = true;
+        moveModal.show();
         
-        // Toggle between grid and list view
-        function toggleView(view) {
-            const gridView = document.getElementById('filesGrid');
-            const listView = document.getElementById('filesList');
-            const buttons = document.querySelectorAll('.view-btn');
+        const response = await fetch('/get_folder_tree');
+        const tree = await response.json();
+        
+        folderTreeDiv.innerHTML = '';
+        
+        const rootDiv = document.createElement('div');
+        rootDiv.innerHTML = `<i class="fas fa-hdd fa-fw"></i> Raiz (/)`;
+        rootDiv.className = 'folder-item';
+        rootDiv.dataset.path = '/';
+        rootDiv.addEventListener('click', function() {
+             document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('selected'));
+             this.classList.add('selected');
+             targetPathInput.value = this.dataset.path;
+             moveSubmitBtn.disabled = false;
+        });
+        folderTreeDiv.appendChild(rootDiv);
+        buildFolderTree(tree['/'], folderTreeDiv);
+    }
+    
+    // --- Event Listeners ---
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); e.preventDefault();
+            const itemElement = this.closest('.item');
+            prepareDeleteModal(itemElement.dataset.itemId, itemElement.dataset.itemName);
+        });
+    });
+
+    document.querySelectorAll('.item').forEach(card => {
+        card.addEventListener('contextmenu', function(e) {
+            e.preventDefault(); e.stopPropagation();
+            currentItemId = card.dataset.itemId;
+            currentItemName = card.dataset.itemName;
             
-            buttons.forEach(btn => btn.classList.remove('active'));
-            event.target.closest('.view-btn').classList.add('active');
+            contextMenu.querySelectorAll('[data-action="tag"]').forEach(el => {
+                el.style.display = card.classList.contains('file-item') ? 'flex' : 'none';
+            });
             
-            if (view === 'grid') {
-                gridView.style.display = 'grid';
-                listView.style.display = 'none';
-            } else {
-                gridView.style.display = 'none';
-                listView.style.display = 'block';
-            }
-            currentView = view;
-        }
-
-        // Drag and drop functionality
-        const uploadArea = document.querySelector('.upload-area');
-        const fileInput = document.getElementById('fileInput');
-        const uploadForm = document.getElementById('uploadForm');
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
+            contextMenu.style.top = `${e.pageY}px`;
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.display = 'block';
         });
+    });
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, highlight, false);
-        });
+    document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none';
+    });
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, unhighlight, false);
-        });
-
-        uploadArea.addEventListener('drop', handleDrop, false);
-
-        function preventDefaults(e) {
-            e.preventDefault();
+    contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.addEventListener('click', function(e) {
             e.stopPropagation();
-        }
+            const action = this.dataset.action;
+            contextMenu.style.display = 'none';
 
-        function highlight(e) {
-            uploadArea.classList.add('dragover');
-        }
-
-        function unhighlight(e) {
-            uploadArea.classList.remove('dragover');
-        }
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            fileInput.files = files;
-            handleFiles(files);
-        }
-
-        fileInput.addEventListener('change', function(e) {
-            handleFiles(e.target.files);
-        });
-
-        function handleFiles(files) {
-            if (files.length === 0) return;
-            
-            showProgress();
-            
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('file', files[i]);
-            }
-            
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                hideProgress();
-                if (response.ok) {
-                    showNotification('Arquivo(s) enviado(s) com sucesso!');
-                    // Recarregar a lista de arquivos
-                    fetchFiles();
-                } else {
-                    response.text().then(text => showNotification('Erro no upload: ' + text));
-                }
-            })
-            .catch(error => {
-                hideProgress();
-                showNotification('Falha no upload: ' + error.message);
-            });
-        }
-
-        function showProgress() {
-            const progressBar = document.getElementById('progressBar');
-            progressBar.style.transform = 'scaleX(1)';
-        }
-
-        function hideProgress() {
-            const progressBar = document.getElementById('progressBar');
-            progressBar.style.transform = 'scaleX(0)';
-        }
-
-        function showNotification(message) {
-            const notification = document.getElementById('notification');
-            const notificationText = document.getElementById('notificationText');
-            notificationText.textContent = message;
-            notification.classList.add('show');
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-
-        // Search functionality
-        const searchInput = document.getElementById('searchInput');
-        searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const fileCards = document.querySelectorAll('.file-card');
-            const tableRows = document.querySelectorAll('.list-table tbody tr');
-            
-            fileCards.forEach(card => {
-                const fileName = card.querySelector('.file-name').textContent.toLowerCase();
-                card.style.display = fileName.includes(searchTerm) ? 'block' : 'none';
-            });
-            
-            tableRows.forEach(row => {
-                const fileName = row.querySelector('.list-file-name').textContent.toLowerCase();
-                row.style.display = fileName.includes(searchTerm) ? 'table-row' : 'none';
-            });
-        });
-
-        // File actions
-        function downloadFile(filename) {
-            window.location.href = `/download/${filename}`;
-        }
-
-        function deleteFile(filename) {
-            if (confirm(`Tem certeza que deseja excluir ${filename}?`)) {
-                fetch(`/delete/${filename}`, {
-                    method: 'DELETE'
+            if (action === 'delete') { prepareDeleteModal(currentItemId, currentItemName); } 
+            else if (action === 'move') { prepareMoveModal(currentItemId, currentItemName); }
+            else if (action === 'tag') {
+                const tag = this.dataset.tag;
+                fetch('/tag_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_id: currentItemId, tag: tag }),
                 })
-                .then(response => {
-                    if (response.ok) {
-                        showNotification(`${filename} foi excluído.`);
-                        fetchFiles(); // Recarregar a lista
-                    } else {
-                        response.text().then(text => showNotification('Erro: ' + text));
-                    }
-                })
-                .catch(error => {
-                    showNotification('Falha: ' + error.message);
-                });
+                .then(res => res.json())
+                .then(data => data.success ? location.reload() : alert('Erro ao aplicar a tag.'));
             }
-        }
-
-        // Função para formatar tamanho de arquivo
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // Função para formatar data
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        // Função para obter ícone por tipo de arquivo
-        function getFileIcon(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            const icons = {
-                pdf: { icon: 'file-pdf', class: 'file-pdf' },
-                jpg: { icon: 'file-image', class: 'file-img' },
-                jpeg: { icon: 'file-image', class: 'file-img' },
-                png: { icon: 'file-image', class: 'file-img' },
-                gif: { icon: 'file-image', class: 'file-img' },
-                doc: { icon: 'file-word', class: 'file-doc' },
-                docx: { icon: 'file-word', class: 'file-doc' },
-                xls: { icon: 'file-excel', class: 'file-xls' },
-                xlsx: { icon: 'file-excel', class: 'file-xls' },
-                ppt: { icon: 'file-powerpoint', class: 'file-ppt' },
-                pptx: { icon: 'file-powerpoint', class: 'file-ppt' },
-                mp4: { icon: 'file-video', class: 'file-video' },
-                mov: { icon: 'file-video', class: 'file-video' },
-                avi: { icon: 'file-video', class: 'file-video' },
-                mp3: { icon: 'file-audio', class: 'file-audio' },
-                wav: { icon: 'file-audio', class: 'file-audio' },
-                zip: { icon: 'file-archive', class: 'file-archive' },
-                rar: { icon: 'file-archive', class: 'file-archive' },
-                txt: { icon: 'file-alt', class: 'file-txt' },
-            };
-            return icons[ext] || { icon: 'file', class: 'file-default' };
-        }
-
-        // Carregar arquivos do servidor
-        async function fetchFiles() {
-            try {
-                const response = await fetch('/');
-                if (!response.ok) throw new Error('Erro ao carregar arquivos');
-                
-                // Obter o HTML da resposta e converter para DOM
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Encontrar os arquivos no DOM
-                const files = Array.from(doc.querySelectorAll('#filesGrid .file-card'));
-                const filesGrid = document.getElementById('filesGrid');
-                const filesListBody = document.getElementById('filesListBody');
-                const emptyState = document.getElementById('emptyState');
-                
-                // Limpar containers
-                filesGrid.innerHTML = '';
-                filesListBody.innerHTML = '';
-                
-                if (files.length === 0) {
-                    emptyState.style.display = 'block';
-                    return;
-                } else {
-                    emptyState.style.display = 'none';
-                }
-                
-                // Processar cada arquivo
-                files.forEach(fileCard => {
-                    const fileName = fileCard.querySelector('.file-name').textContent;
-                    const fileSize = fileCard.querySelector('.file-info span:first-child').textContent;
-                    const fileDate = fileCard.querySelector('.file-info span:last-child').textContent;
-                    
-                    // Criar elemento para grid view
-                    const gridCard = fileCard.cloneNode(true);
-                    filesGrid.appendChild(gridCard);
-                    
-                    // Criar elemento para list view
-                    const fileIcon = getFileIcon(fileName);
-                    const listRow = document.createElement('tr');
-                    listRow.innerHTML = `
-                        <td class="list-file-name">
-                            <i class="fas fa-${fileIcon.icon} list-file-icon ${fileIcon.class}"></i>
-                            ${fileName}
-                        </td>
-                        <td>${fileSize}</td>
-                        <td>${fileDate}</td>
-                        <td>
-                            <button class="action-btn btn-download" onclick="downloadFile('${fileName}')">
-                                <i class="fas fa-download"></i>
-                            </button>
-                            <button class="action-btn btn-delete" onclick="deleteFile('${fileName}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    `;
-                    filesListBody.appendChild(listRow);
-                });
-                
-                // Atualizar ações nos novos elementos da grid
-                filesGrid.querySelectorAll('.file-card').forEach(card => {
-                    const fileName = card.querySelector('.file-name').textContent;
-                    card.querySelector('.btn-download').onclick = () => downloadFile(fileName);
-                    card.querySelector('.btn-delete').onclick = () => deleteFile(fileName);
-                });
-                
-            } catch (error) {
-                console.error('Erro:', error);
-                showNotification('Falha ao carregar arquivos');
-            }
-        }
-
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            // Simulate loading animation
-            setTimeout(() => {
-                document.querySelector('.container').style.opacity = '1';
-            }, 300);
-            
-            // Carregar arquivos do servidor
-            fetchFiles();
         });
-    </script>
-</body>
-</html>
+    });
+});
+</script>
+{% endblock %}

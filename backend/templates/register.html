@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Registro{% endblock %}
+
+{% block body %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>Crie sua conta</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-danger" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/register">
+            <div class="mb-3">
+                <input type="text" class="form-control" name="username" placeholder="Escolha um nome de usuário" required>
+            </div>
+            <div class="mb-3">
+                <input type="password" class="form-control" name="password" placeholder="Crie uma senha" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Registrar</button>
+        </form>
+        <p class="auth-switch-link">
+            Já tem uma conta? <a href="{{ url_for('login') }}">Faça login aqui</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

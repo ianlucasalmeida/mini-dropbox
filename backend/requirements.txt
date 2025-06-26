@@ -1,3 +1,6 @@
 Flask
-boto3  # SDK da AWS para Python, usado para S3 e MinIO
+boto3
 python-dotenv
+Flask-SQLAlchemy  # Para interagir com o banco de dados
+Flask-Login       # Para gerenciar o login e sessões de usuário
+Werkzeug          # Já vem com o Flask, mas garantimos a versão para hashing de senha
